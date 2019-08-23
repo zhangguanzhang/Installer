@@ -1,0 +1,47 @@
+version: '3.4'
+services:
+  nginx:
+    image: nginx:alpine
+    hostname: nginx
+    volumes:
+      - /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime:ro
+      - ./http:/usr/share/nginx/html
+      - ./nginx-conf.d/:/etc/nginx/conf.d/
+    network_mode: "host"
+    logging:
+      driver: json-file
+      options:
+        max-file: '3'
+        max-size: 100m
+
+  tftp:
+    image: zhangguanzhang/tftp
+    hostname: tftp
+    volumes:
+      - /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime:ro
+      - ./tftp:/var/tftpboot
+    command:
+      ["--verbose", "--foreground", "--secure", "/var/tftpboot"]
+    network_mode: "host"
+    logging:
+      driver: json-file
+      options:
+        max-file: '3'
+        max-size: 100m
+  mysql:
+    image: mysql:5.7.26
+    hostname: mysql
+    volumes:
+      - /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime:ro
+      - ./mysql:/var/lib/mysql
+    network_mode: "host"
+    environment:
+      MYSQL_DATABASE: pxe
+      MYSQL_USER: pxe
+      MYSQL_PASSWORD: zhangguanzhang
+      MYSQL_ROOT_PASSWORD: zhangguanzhang
+    logging:
+      driver: json-file
+      options:
+        max-file: '3'
+        max-size: 100m

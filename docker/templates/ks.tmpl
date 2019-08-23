@@ -1,0 +1,410 @@
+#version=RHEL7
+# System authorization information
+auth --enableshadow --passalgo=sha512
+# Root password
+rootpw --iscrypted $6$aQd7KMc4vTVvoOrd$vdcUdZXS47JJi1ysoCfsJjYWqY.xAuv.5T6nugT1egBlh5cVjMqeYMAzWmnjViUQ1CiL3BfG9p7Z7A5JRCquJ/
+
+# Use CDROM installation media
+#cdrom
+
+# Run the Setup Agent on first boot
+firstboot --disable
+
+# Keyboard layouts
+keyboard --vckeymap=us --xlayouts='us'
+
+# System language
+lang en_US.UTF-8
+
+# Use text mode install
+#text
+
+# Firewall configuration
+firewall --disabled
+
+# Accept Eula
+eula --agreed
+
+url --url="http://10.1.0.2/cvk"
+
+# Network information
+network  --hostname={{.Hostname}}
+
+# SELinux configuration
+selinux --disabled
+
+# System timezone
+timezone Asia/Shanghai --isUtc
+# X Window System configuration information
+#xconfig  --startxonboot
+skipx
+
+# Clear the Master Boot Record
+#zerombr
+
+# NEVER ever place zerombr here, it breaks automated installation
+%include /tmp/partition.ks
+%include /tmp/post_partition.ks
+
+#autopart --type=lvm
+#clearpart --all --initlabel
+#part /boot --fstype xfs --size=500
+#part pv.01 --size=1 --grow
+#volgroup centos pv.01
+#logvol swap --vgname=centos --size=8192 --name=swap
+#logvol /    --vgname=centos --size=100000 --name=root
+
+
+# PREINSTALL SECTION
+# HERE ARE COMMANDS THAT WILL BE LAUNCHED BEFORE
+# INSTALLATION PROCESS ITSELF
+%pre
+#!/bin/bash
+
+arcconf getconfig 1 ld | grep -qw 'No logical'
+if [ "$?" -eq 0 ];then
+
+    #获取实际硬盘的Channel id存成数组:0,1  0,0  取最后两个槽位做系统盘的raid1
+    hardDiskChannelIDArray=( $(arcconf getconfig 1 pd | grep Channel | tac | awk -F'[: ()]+' 'NR!=1&&NR<4{print $6}') )
+    arcconf task start 1 device all initialize noprompt  #初始化所有硬盘
+    #              控制器id               容量  raid级别
+    arcconf create    1     logicaldrive Wcache WBB max    1   ${hardDiskChannelIDArray[@]//,/ }  noprompt
+
+fi
+
+{{if and .IPMIIP .IPMIMask .IPMIGw}}
+    # 获取eth1的信息,该字段为8
+    ipmitool raw 0x0c 0x02   0x08   0x04 0x00 0x00 | grep -qw '02'   # dhcp
+    if [ "$?" -eq 0 ];then
+        ipmitool lan set 8 ipsrc static
+    fi
+    ipmitool lan set 8 ipaddr {{.IPMIIP}}
+    ipmitool lan set 8 netmask {{.IPMIMask}}
+    ipmitool lan set 8 defgw ipaddr {{.IPMIGw}}
+    #ipmitool chassis bootdev disk options=efiboot,persistent # force boot from desik, and set the mode to uefi
+    #  ipmitool raw 0x00 0x08 0x05  0xE0 0x08  0x00 0x00 0x00 #uefi启动,强制boot from disk
+{{end}}
+
+# hard drives
+drives=""
+removable_drives=""
+for drv in `ls -1 /sys/block | grep "sd\|hd\|vd\|cciss"`; do
+    if !(blkid | grep -q "${drv}.*CloudOS") && (lsblk | grep -q "${drv}") && \
+    (! ls -l /dev/disk/by-path/ | grep ${drv} | grep -q 'fc'); then
+        if (grep -q 0 /sys/block/${drv}/removable); then
+            drives="${drives} ${drv}"
+        else
+            removable_drives="${removable_drives} ${drv}"
+        fi
+    fi
+done
+default_drive=`echo ${drives} ${removable_drives} | awk '{print $1}'`
+
+installdrive=${installdrive:-undefined}
+forceformat=${forceformat:-no}
+for I in $(cat /proc/cmdline); do
+  case "$I" in
+    *=*)
+      if ! [[ "${I}" =~ "." ]]; then eval "$I"; fi
+    ;;
+  esac
+done
+
+set ${drives} ${removable_drives}
+numdrives=`echo $#`
+
+tgtdrives="${installdrive}"
+
+function confirm_format {
+  check_drive="$1"
+  local confirm_format="no"
+
+  if [[ "$forceformat" == "yes" ]] ; then
+    return 0
+  fi
+
+  if parted -s /dev/$check_drive print &>/dev/null ; then
+    echo
+    echo "$check_drive drive contains partition table:"
+    parted -s /dev/$check_drive print
+    echo
+    read -p "Are you sure you want to erase ALL data on disk $check_drive? (y/N)" confirm_format
+    if [[ "$confirm_format" == "y" ]] || [[ "$confirm_format" == "Y" ]] || [[ "$forceformat" == "yes" ]]; then
+      read -p "Warning! ALL data will be lost! continue? (y/N)" confirm_format
+      if [[ "$confirm_format" == "y" ]] || [[ "$confirm_format" == "Y" ]] || [[ "$forceformat" == "yes" ]]; then
+        return 0
+      else
+        return 1
+      fi
+    else
+      return 1
+    fi
+  else
+    return 0
+  fi
+}
+
+format_confirmed="no"
+min_tgtdrivessize=512000
+
+if [ $numdrives -lt 1 ]; then
+    exec < /dev/tty3 > /dev/tty3 2>&1
+    chvt 3
+    clear
+    echo
+    echo '********************************************************************'
+    echo '*                            E R R O R                             *'
+    echo '*                                                                  *'
+    echo '*      There is no suitable media available for installation.      *'
+    echo '*                Please attach a drive and try again.              *'
+    echo '*                                                                  *'
+    echo '********************************************************************'
+    echo
+    read -p "Press Enter to shut down the system: " _
+    poweroff
+else
+    exec < /dev/tty3 > /dev/tty3 2>&1
+    chvt 3
+    clear
+    read -t 5 -n1 char
+    if [[ ${char} == 's' ]]; then
+        clear
+        read -p "Please input the minimum size of disk (GB): " min_tgtdrivessize
+        if [[ "${min_tgtdrivessize}" =~ ^[1-9][0-9]* ]]; then
+            let min_tgtdrivessize=min_tgtdrivessize*1024
+        else
+            min_tgtdrivessize=512000
+        fi
+    fi
+    clear
+    chvt 1
+fi
+
+
+if [ ${numdrives} -gt 1 ] || [ `echo ${drives} | wc -w` -eq 0 ] ; then
+    exec < /dev/tty3 > /dev/tty3 2>&1
+    chvt 3
+    while [ "${tgtdrives}" = "undefined" ]; do
+        clear
+        echo
+        echo '********************************************************************************'
+        echo '*                                 W A R N I N G                                *'
+        echo '*                                                                              *'
+        echo '*  Which of the detected hard drives do you want to be used as                 *'
+        echo '*  the installation target?                                                    *'
+        echo '*                                                                              *'
+        echo '********************************************************************************'
+        echo
+        echo -e "Disk\t Size\t Label   \t Model"
+        for drive in ${drives} ${removable_drives}; do
+            model=`parted -s /dev/$drive print 2>/dev/null | grep Model | awk -F: '{print $2}'`
+            part_table=`parted -s /dev/$drive print 2>/dev/null | grep 'Partition Table' | awk -F: '{print $2}'`
+            size=`parted -s /dev/$drive print 2>/dev/null | grep 'Disk /' | awk -F: '{print $2}'`
+            echo -e "$drive\t$size\t$part_table    \t$model"
+        done
+        echo
+        echo "Possible choices"
+        echo "Persistent drives: ${drives}"
+        echo "Removable drives: ${removable_drives}"
+        echo
+        if [ `echo ${drives} | wc -w` -eq 1 ] ; then
+            read -t 30 -p "Choose hard drive: " tgtdrives || tgtdrives=$default_drive
+	elif [[ -z "${drives}" && `echo ${removable_drives} | wc -w` -eq 1 ]];then
+	    read -t 30 -p "Choose hard drive: " tgtdrives || tgtdrives=$removable_drives
+        else
+            read -p "Choose hard drive: " tgtdrives
+        fi
+
+        for tgtdrive in $tgtdrives; do
+            match="no"
+            for drive in ${drives[@]} ${removable_drives[@]}; do
+                if [[ "$drive" == "$tgtdrive" ]] && match="yes" ; then
+                    break
+                fi
+            done
+            [[ $match == "no" ]] && break
+        done
+
+        if [[ "$match" == "yes" ]]; then
+            for tgtdrive in $tgtdrives; do
+                format_confirmed="no"
+                if confirm_format $tgtdrive ; then
+                  format_confirmed="yes"
+                else
+                  tgtdrives="undefined"
+                  read -p "You may select another disk. Press Enter to continue." _
+                  break
+                fi
+            done
+        elif [[ "$match" == "no" ]]; then
+          tgtdrives="undefined"
+          read -p "Invalid choice. Press Enter to continue." _
+        fi
+    done
+    clear
+    chvt 1
+else
+    tgtdrives=`echo ${drives} | sed -e "s/^\s*//" -e "s/\s*$//"`
+fi
+
+# verify tgtdrives is at least 500GB
+tgtdrivessize=0
+for tgtdrive in $tgtdrives; do
+  let tgtdrivessize=$tgtdrivessize+$(( $(cat "/sys/class/block/${tgtdrive}/size") / 2 / 1024 ))
+done
+
+#if [ $tgtdrivessize -lt $min_tgtdrivessize ]; then
+#    exec < /dev/tty3 > /dev/tty3 2>&1
+#    chvt 3
+#    clear
+#    echo
+#    echo '********************************************************************'
+#    echo '*                            E R R O R                             *'
+#    echo '*                                                                  *'
+#    echo "*  Your disk is under $(($min_tgtdrivessize/1024))GB in size. Installation cannot continue. "
+#    echo '*             Restart installation with a larger disk.             *'
+#    echo '*                                                                  *'
+#    echo '********************************************************************'
+#    echo
+#    read -p "Press Enter to restart: " _
+#    reboot
+#fi
+
+if [ "$format_confirmed" != "yes" ] ; then
+  exec < /dev/tty3 > /dev/tty3 2>&1
+  chvt 3
+  for tgtdrive in $tgtdrives; do
+      if ! confirm_format $tgtdrive ; then
+          clear
+          echo
+          echo '********************************************************************'
+          echo '*                            E R R O R                             *'
+          echo '*                                                                  *'
+          echo "*           Disk $tgtdrive contains active partition(s).            "
+          echo '*        Installation cannot continue without confirmation.        *'
+          echo '*                                                                  *'
+          echo '********************************************************************'
+          echo
+          read -p "Press Enter to restart: " _
+          reboot
+      fi
+  done
+  chvt 1
+fi
+
+# paths in /dev have "/" instead of "!" for cciss devices
+tgtdrives=$(echo $tgtdrives | sed -e 's/!/\//')
+tgtdrives_arr=(${tgtdrives})
+
+vgdisplay -c | cut -d':' -f1 | xargs vgremove -ff
+
+for tgtdrive in ${tgtdrives_arr[@]}; do
+  dd if=/dev/zero of=/dev/${tgtdrive} bs=10M count=10
+  sleep 3
+  hdparm -z /dev/${tgtdrive}
+  parted -s /dev/${tgtdrive} mklabel gpt
+done
+
+parted -a none -s /dev/${tgtdrives_arr[0]} unit MiB mkpart primary 0% 24
+parted -s /dev/${tgtdrives_arr[0]} set 1 bios_grub on
+parted -a none -s /dev/${tgtdrives_arr[0]} unit MiB mkpart primary fat16 24 224
+parted -s /dev/${tgtdrives_arr[0]} set 2 boot on
+parted -a none -s /dev/${tgtdrives_arr[0]} unit MiB mkpart primary 224 732
+
+sleep 3
+hdparm -z /dev/${tgtdrives_arr[0]}
+
+# partition
+
+# This adds support for the p seperator required for cciss devices
+if echo ${tgtdrives_arr[0]} | grep -q -e cciss ; then
+    bootdev=${tgtdrives_arr[0]}p
+else
+    bootdev=${tgtdrives_arr[0]}
+fi
+
+#cat << EOF > /tmp/partition.ks
+pv_index=1
+echo "part biosboot --onpart=/dev/${bootdev}1" >> /tmp/partition.ks
+echo "part /boot --onpart=/dev/${bootdev}3" >> /tmp/partition.ks
+echo "part /boot/efi --onpart=/dev/${bootdev}2" >> /tmp/partition.ks
+for tgtdrive in ${tgtdrives}; do
+  echo "part pv.00$pv_index --ondisk=${tgtdrive} --size=50000 --grow" >> /tmp/partition.ks
+  pv_num_arr[$pv_index]="pv.00$pv_index"
+  let pv_index++
+done
+
+echo "volgroup centos ${pv_num_arr[*]}" >> /tmp/partition.ks
+echo "logvol swap --vgname=centos --size=16384 --name=swap" >> /tmp/partition.ks
+#echo "logvol / --vgname=centos --maxsize=51200 --percent=40 --name=root --fstype=ext4" >> /tmp/partition.ks
+echo "logvol / --vgname=centos --size=128000 --name=root --fstype=ext4" >> /tmp/partition.ks
+let vms_num=$tgtdrivessize-150000
+echo "logvol /vms --vgname=centos --size=${vms_num}  --name=vms --fstype=ext4" >> /tmp/partition.ks
+#EOF
+
+# Anaconda can not install grub 0.97 on disks which are >4T.
+# The reason is that grub does not support such large geometries
+# and it simply thinks that the cylinder number has negative value.
+# Here we just set geometry manually so that grub thinks that disk
+# size is equal to 1G.
+# 130 cylinders * (16065 * 512 = 8225280 bytes) = 1G
+echo "%post --nochroot --log=/mnt/sysimage/root/anaconda-post-partition.log" > /tmp/post_partition.ks
+echo "echo \"device (hd0) /dev/${tgtdrives_arr[0]}\" >> /tmp/grub.script" >> /tmp/post_partition.ks
+echo "echo \"geometry (hd0) 130 255 63\" >> /tmp/grub.script" >> /tmp/post_partition.ks
+echo "echo \"root (hd0,2)\" >> /tmp/grub.script" >> /tmp/post_partition.ks
+echo "echo \"install /grub/stage1 (hd0) /grub/stage2 p /grub/grub.conf\" >> /tmp/grub.script" >> /tmp/post_partition.ks
+echo "echo quit >> /tmp/grub.script" >> /tmp/post_partition.ks
+echo "cat /tmp/grub.script | chroot /mnt/sysimage /sbin/grub --no-floppy --batch" >> /tmp/post_partition.ks
+echo "%end" >> /tmp/post_partition.ks
+%end
+
+%post
+#!/bin/bash
+
+if [ -r /sys/class/dmi/id/product_serial ];then
+    echo curl -X POST -H "X-System-Serial-Number:$(cat /sys/class/dmi/id/product_serial)" http://10.1.0.2:8080/api/v1/ks
+fi
+
+%end
+
+%packages
+@base
+@core
+@debugging
+@cvk-packages
+#@desktop-debugging
+#@directory-client
+#@fonts
+#@gnome-desktop
+#@guest-agents
+#@guest-desktop-agents
+#@hardware-monitoring
+#@input-methods
+#@large-systems
+#@mariadb
+#@mongodb
+#@multimedia
+#@network-file-system-client
+#@openstack-ceilometer
+#@openstack-cinder
+#@openstack-dashboard
+#@openstack-glance
+#@openstack-keystone
+#@openstack-neutron-compute
+#@openstack-neutron-server
+#@openstack-nova
+#@openstack-utils
+#@performance
+#@perl-runtime
+#@postgresql
+#@postgresql-client
+#@rabbitmq
+#@x11
+#@saltstack-master
+#@saltstack-minion
+#@cobbler
+%end
+
+
+reboot --eject
+
