@@ -94,7 +94,7 @@
     10.1.1.0/24           10.1.1.0/24           10.1.1.0/24           10.1.1.0/24           10.1.1.0/24
 ```
 一个机柜是一个最小单位，所以一个机柜一个段
-实操部署步骤:
+### 实操部署步骤:
 
 - [安装docker](https://github.com/zhangguanzhang/docker-need-to-know/blob/master/untitled/an-zhuang-docker.md)和[安装docker-compose](https://docs.docker.com/compose/install/)
 - 安装好go后，配置好环境变量开启go mod
@@ -122,3 +122,8 @@ go build -o docker/main main.go # 编译可执行文件到docker目录下的main
 - 所有物理机开机即可
 
 有条件先一台物理机测试下，可行了后续基本就都固化了
+
+### 可扩展的设想
+
+- 目前的dhcp是在交换机上，可以开发dhcp server，因为ipmi出场是固定ip的，有些服务器厂商的mac地址贴在机器表面了，可以根据mac地址返回不同的boot-filename
+- 同样的，可以用tftp server根据请求grub.cfg时候第一次请求的是自身mac地址，可以提前导入mac地址去渲染返回不同的grub.cfg从而安装不同的操作系统
