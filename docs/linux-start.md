@@ -60,7 +60,7 @@ initrd = images/pxeboot/initrd.img
 ```
 $ cd 
 $ mkdir /root/test
-$ mount -t auto /dev/drom /mnt
+$ mount -t auto /dev/cdrom /mnt
 $ cp -ar /mnt /root/iso   # 原来root下没有iso目录，拷贝过来重命名为iso
 $ umount /mnt
 $ cp iso/images/pxeboot/initrd.img test/
