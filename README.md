@@ -51,6 +51,8 @@
 - [PXE](./docs/pxe.md)
 - [Linux安装启动过程(Centos为例)以及ISO的修改](./docs/linux-start.md)
 - [详细讲解kickstart](./docs/kickstart.md)
+- [Installer接口说明](./docs/api.md)
+
 
 ### 总结
 

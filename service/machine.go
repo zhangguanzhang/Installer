@@ -2,10 +2,8 @@ package service
 
 import (
 	"Installer/models"
-	"errors"
 	"github.com/360EntSecGroup-Skylar/excelize/v2"
 	"github.com/jinzhu/gorm"
-	log "github.com/sirupsen/logrus"
 )
 
 //对应excel里列的字段
@@ -30,22 +28,19 @@ const (
 	SheetName = "Sheet1"
 )
 
-func LoadToDB(filename string) error {
-
-	f, err := excelize.OpenFile(filename)
-	if err != nil {
-		return err
-	}
+//传入文件名和SheetName导入数据库，返回已经存在的机器
+func LoadToDB(f *excelize.File, SheetName string) ([]string, error) {
+	var instance = make([]string, 0)
 
 	rows, err := f.GetRows(SheetName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	rows = append(rows[:0], rows[1:]...) //删掉标题栏
 
 	for _, row := range rows {
-		if err = machinesAdd(&models.Machines{
+		if err = AddMachine(&models.Machine{
 			DeviceLabel: row[MachineTagName],
 			KSHeader: &models.KSHeader{
 				SerialNumber: row[SeriaNum],
@@ -58,105 +53,85 @@ func LoadToDB(filename string) error {
 			MGMask:   row[MGMask],
 			MGGW:     row[MGGateway],
 		}); err != nil {
-			log.Error(err)
+			// 错误不为空则表明机器已经存在
+			instance = append(instance, row[HOSTNAME])
 		}
 	}
-	return nil
+	return instance, nil
 }
 
-func machinesAdd(m *models.Machines) error {
+func GetMachinesTotal(data map[string]interface{}) (int, error) {
+	var (
+		count int
+		err error
+	)
 
-	var temp models.Machines
-	err := db.Where("SerialNumber = ?", m.SerialNumber).First(&temp).Error
+	if len(data) == 0 {
+		err = db.Model(&models.Machine{}).Count(&count).Error
+	} else {
+		err = db.Model(&models.Machine{}).Where(data).Count(&count).Error
+	}
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			db.Create(&m)
-			return nil
-		}
-		log.Println(err)
-		return err
+		return 0, err
 	}
-
-	//if err = db.Model(&Machines{}).Where("SerialNumber = ?", m.SerialNumber).UpdateColumn(
-	//	map[string]interface{}{
-	//		"DeviceLabel": m.Arch,
-	//		"IPMIIPMask":  m.System,
-	//		"IPMIGW":      m.NIC1Name,
-	//		"Hostname":    m.NIC1MAC,
-	//		"MGIPMask":    m.NIC2Name,
-	//		"MGGW":        m.NIC2MAC,
-	//	}).Error; err != nil {
-	//	return err
-	//}
-
-	return nil
+	return count, nil
 }
 
-//根据序列号返回整列
-func SearchKSInfo(SerialNumber string) (*models.Machines, error) {
-
+func GetMachines(data map[string]interface{}) ([]models.Machine, error) {
 	var err error
-	instance := models.Machines{}
-
-	if err = db.Where("SerialNumber = ?", SerialNumber).First(&instance).Error; err != nil {
+	var instance []models.Machine
+	err = db.Where(data).Find(&instance).Error
+	if err != nil {
 		return nil, err
+	} else {
+		return instance, nil
 	}
-	if instance.ID == 0 {
-		return nil, errors.New("not found")
-	}
-	return &instance, nil
 }
 
-//记录ks的header里的mac填充到数据库里
-func FillNicInfo(m *models.KSHeader) (err error) {
+func GetMachine(SN string) (*models.Machine, error) {
+	var err error
+	var instance models.Machine
+	err = db.Model(&models.Machine{}).Where("SerialNumber = ?", SN).First(&instance).Error
+	if err != nil {
+		return nil, err
+	} else {
+		return &instance, nil
+	}
+}
 
-	if err = db.Model(&models.Machines{}).Where("SerialNumber = ?", m.SerialNumber).UpdateColumn(
-		map[string]interface{}{
-			"Arch":     m.Arch,
-			"System":   m.System,
-			"NIC1Name": m.NIC1Name,
-			"NIC1MAC":  m.NIC1MAC,
-			"NIC2Name": m.NIC2Name,
-			"NIC2MAC":  m.NIC2MAC,
-			"NIC3Name": m.NIC3Name,
-			"NIC3MAC":  m.NIC3MAC,
-			"NIC4Name": m.NIC4Name,
-			"NIC4MAC":  m.NIC4MAC,
-			"NIC5Name": m.NIC5Name,
-			"NIC5MAC":  m.NIC5MAC,
-			"NIC6Name": m.NIC6Name,
-			"NIC6MAC":  m.NIC6MAC,
-			"NIC7Name": m.NIC7Name,
-			"NIC7MAC":  m.NIC7MAC,
-			"NIC8Name": m.NIC8Name,
-			"NIC8MAC":  m.NIC8MAC,
-			"Count":    gorm.Expr("Count + 1"),
-		}).Error; err != nil && err != gorm.ErrRecordNotFound {
+
+func AddMachine(m *models.Machine) error {
+	return db.Create(m).Error
+}
+
+
+func UpdateMachine(m *models.Machine) error {
+	var (
+		count int
+		err error
+	)
+	err = db.Model(&models.Machine{}).Where("SerialNumber = ?", m.SerialNumber).Count(&count).Updates(m).Error
+	if err != nil {
 		return err
 	}
-
+	if count != 1 {
+		return gorm.ErrRecordNotFound
+	}
 	return nil
 }
 
-func KsPostStatus(SerialNumber string) error {
-	var err error
 
-	if err = db.Model(&models.Machines{}).Where("SerialNumber = ?", SerialNumber).UpdateColumn(
-		map[string]interface{}{
-			"InstallStatus": 1,
-		}).Error; err != nil && err != gorm.ErrRecordNotFound {
+func DeleteMachine(SerialNumber string) error {
+	var (
+		count int
+		err error
+	)
+	err = db.Where("SerialNumber = ?", SerialNumber).Unscoped().Count(&count).Delete(models.Machine{}).Error
+	if err != nil {
 		return err
 	}
-
-	return nil
-}
-
-func Delete(SerialNumber string) error {
-	var err error
-	err = db.Where("SerialNumber = ?", SerialNumber).Delete(models.Machines{}).Error
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return err
+	if count != 1 {
+		return gorm.ErrRecordNotFound
 	}
-
 	return nil
 }

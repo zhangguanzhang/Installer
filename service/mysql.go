@@ -2,27 +2,52 @@ package service
 
 import (
 	"Installer/models"
-	"fmt"
 	"github.com/jinzhu/gorm"
-	"os"
+	_ "github.com/jinzhu/gorm/dialects/mysql"
+	"strings"
 )
 
 var db *gorm.DB
 
-func init() {
+func DBInit(userPass, hostAndPortAndDBName string) error {
 	var err error
-	db, err = gorm.Open("mysql", "root:zhangguanzhang@tcp(127.0.0.1:3306)/pxe?charset=utf8&parseTime=True&loc=Local")
+	conInfo := strings.Split(hostAndPortAndDBName, "@")
+	db, err = gorm.Open("mysql", userPass + "@tcp(" + conInfo[0] + ")/" + conInfo[1] + "?charset=utf8&parseTime=True&loc=Local")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(2)
+		return err
 	}
 
 	db.DB().SetMaxOpenConns(100)
 	db.DB().SetMaxIdleConns(0)
 
-	if !db.HasTable(&models.Machines{}) {
-		if err = db.Set("gorm:table_options", "ENGINE=InnoDB DEFAULT CHARSET=utf8").CreateTable(&models.Machines{}).Error; err != nil {
-			panic(err)
+	if !db.HasTable(&models.Machine{}) {
+		if err = db.Set("gorm:table_options", "ENGINE=InnoDB DEFAULT CHARSET=utf8").CreateTable(&models.Machine{}).Error; err != nil {
+			return err
 		}
 	}
+
+	return db.AutoMigrate(&models.Machine{}).Error
+}
+
+
+func DBClose() error {
+	return db.Close()
+}
+
+func ReturnColumnNames() []string {
+
+	var (
+		data []struct {
+			ColumnName string `json:"column_name"`
+		}
+		result = make([]string, 0)
+	)
+
+	db.Raw("SELECT column_name FROM information_schema.columns WHERE table_name = ?", "machines").Scan(&data)
+
+	for _, v := range data {
+		result = append(result, v.ColumnName)
+	}
+	return result
+
 }

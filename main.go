@@ -1,25 +1,53 @@
 package main
 
 import (
-	"Installer/api"
-	"Installer/api/v1"
-	"github.com/gin-gonic/gin"
+	"Installer/router"
+	"Installer/service"
+	"flag"
+	log "github.com/sirupsen/logrus"
+	"os"
+	"strconv"
 )
 
+// @title Installer API
+// @version 1.0
+// @description some api of this
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.url http://www.swagger.io/support
+// @contact.email support@swagger.io
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host localhost:8080
+// @BasePath /api/v1
+
 func main() {
-	router := gin.Default()
 
-	//设定请求url不存在的返回值
-	router.NoRoute(api.NoResponse)
+	port := flag.Int("port", 8080, "http server port")
+	dbInfo := flag.String("db", "127.0.0.1:3306@pxe", "database host with port, like ip:host@database")
+	con := flag.String("user", "root:zhangguanzhang", "user:pass connect to db")
+	ks := flag.String("ks", "templates/ks.tmpl", "kickstart template file")
 
-	router.LoadHTMLGlob("templates/*")
+	flag.Parse()
 
-	apiV1 := router.Group("/api/v1")
-	{
-		apiV1.GET("/ks", v1.GetKsFile)
-		apiV1.POST("/ks", v1.KsUpdate)
-		apiV1.POST("/upload", v1.ExcelUpload)
+	_, err := os.Stat(*ks)
+	if err != nil && os.IsNotExist(err) {
+		log.Fatalf("kickstart template file %s %v", *ks, err)
 	}
 
-	_ = router.Run(":8080")
+
+	if err := service.DBInit(*con, *dbInfo); err != nil {
+		log.Fatal(err)
+	}
+
+	defer service.DBClose()
+
+
+	Router := router.InitRouter(*ks)
+	if err := Router.Run(":" + strconv.Itoa(*port)); err != nil {
+		log.Fatal(err)
+	}
 }
