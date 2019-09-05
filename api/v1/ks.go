@@ -54,13 +54,13 @@ func GetKsFile(KSTemplate string) gin.HandlerFunc {
 			err := service.FillNicInfo(ks)
 			if err != nil {
 				log.Printf("service.FillNicInfo: %s", err)
-				api.NewResponse(c, http.StatusInternalServerError, "something wrong", nil)
+				api.NewResponse(c, http.StatusInternalServerError, "something wrong")
 				return
 			}
 			m, err := service.SearchKSInfo(c.GetHeader(SerialNumber))
 			if err != nil {
 				log.Printf("service.SearchKSInfo: %s|SN: %s", err, ks.SerialNumber)
-				api.NewResponse(c, http.StatusInternalServerError, "something wrong", nil)
+				api.NewResponse(c, http.StatusInternalServerError, "something wrong")
 				return
 			}
 			info := &models.KSTemplateInfo{
@@ -81,7 +81,7 @@ func GetKsFile(KSTemplate string) gin.HandlerFunc {
 
 		} else {
 			log.Println(c.Request.Header)
-			api.NewResponse(c, http.StatusBadRequest, "not a kickstart request!", nil)
+			api.NewResponse(c, http.StatusBadRequest, "not a kickstart request!")
 		}
 
 	}
@@ -95,8 +95,5 @@ func UpdateStatusFromKs(c *gin.Context) {
 		log.Error(err)
 		api.NoResponse(c)
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"status": 0,
-		"msg":    "ok",
-	})
+	api.NewResponse(c, http.StatusOK)
 }

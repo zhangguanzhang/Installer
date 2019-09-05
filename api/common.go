@@ -13,14 +13,25 @@ var (
 
 
 // Response setting gin.JSON
-func NewResponse(ctx *gin.Context, httpCode int, Msg, data interface{}) {
-	var msg  = "ok"
+func NewResponse(ctx *gin.Context, httpCode int, info ...interface{}) {
+	var (
+		msg  = "ok"
+		data interface{} = nil
+	)
 
-	switch v := Msg.(type) {
-	case error:
-		msg = v.Error()
-	case string:
-		msg = v
+	if httpCode != http.StatusOK {
+		msg = "not ok"
+	}
+	if len(info) >= 1 && info[0] != nil {
+		switch v := info[0].(type) {
+		case error:
+			msg = v.Error()
+		case string:
+			msg = v
+		}
+	}
+	if len(info) >= 2 && info[1] != nil {
+		data = info[1]
 	}
 
 	ctx.JSON(httpCode, Response{

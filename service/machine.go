@@ -97,6 +97,7 @@ func GetMachine(SN string) (*models.Machine, error) {
 	} else {
 		return &instance, nil
 	}
+
 }
 
 

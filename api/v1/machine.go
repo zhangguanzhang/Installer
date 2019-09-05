@@ -38,7 +38,7 @@ func GetMachines(c *gin.Context) {
 			if len(v) == 1 && len(v[0]) != 0 {
 				paramMap[k] = v[0]
 			} else {
-				api.NewResponse(c, http.StatusBadRequest, nil, nil)
+				api.NewResponse(c, http.StatusBadRequest)
 				return
 			}
 		}
@@ -61,7 +61,7 @@ func GetMachine(c *gin.Context) {
 
 	data, err := service.GetMachine(sn)
 	if err != nil {
-		api.NewResponse(c, http.StatusBadRequest, err, nil)
+		api.NewResponse(c, http.StatusBadRequest, err)
 		return
 	}
 	api.NewResponse(c, http.StatusOK, nil, data)
@@ -73,16 +73,16 @@ func AddMachine(c *gin.Context) {
 	var data models.Machine
 
 	if err := c.BindJSON(data); err != nil {
-		api.NewResponse(c, http.StatusBadRequest, err, nil)
+		api.NewResponse(c, http.StatusBadRequest, err)
 		return
 	}
 
 	if err := service.AddMachine(&data); err != nil {
-		api.NewResponse(c, http.StatusInternalServerError, err, nil)
+		api.NewResponse(c, http.StatusInternalServerError, err)
 		log.Printf("AddWorkRecord error:%v, %v", err, data)
 		return
 	}
-	api.NewResponse(c, http.StatusOK, nil, nil)
+	api.NewResponse(c, http.StatusOK)
 }
 
 
@@ -93,12 +93,12 @@ func UpdateMachine(c *gin.Context) {
 	var data models.Machine
 
 	if err := json.NewDecoder(c.Request.Body).Decode(&data); err != nil {
-		api.NewResponse(c, http.StatusBadRequest, err, nil)
+		api.NewResponse(c, http.StatusBadRequest, err)
 		return
 	}
 
 	if data.IsEmpty() {
-		api.NewResponse(c, http.StatusBadRequest, "At least one correct field name is required", nil)
+		api.NewResponse(c, http.StatusBadRequest, "At least one correct field name is required")
 		return
 	}
 
@@ -107,11 +107,11 @@ func UpdateMachine(c *gin.Context) {
 
 	err := service.UpdateMachine(&data)
 	if err != nil {
-		api.NewResponse(c, http.StatusBadRequest, err, nil)
+		api.NewResponse(c, http.StatusBadRequest, err)
 		return
 	}
 
-	api.NewResponse(c, http.StatusOK, nil, nil)
+	api.NewResponse(c, http.StatusOK)
 }
 
 
@@ -119,10 +119,10 @@ func DeleteMachine(c *gin.Context) {
 
 	sn := c.Param("sn")
 	if err := service.DeleteMachine(sn); err != nil {
-		api.NewResponse(c, http.StatusBadRequest, err, nil)
+		api.NewResponse(c, http.StatusBadRequest, err)
 		return
 	}
-	api.NewResponse(c, http.StatusOK, nil, nil)
+	api.NewResponse(c, http.StatusOK)
 }
 
 
@@ -137,7 +137,7 @@ func UploadExcel(c *gin.Context) {
 	// 上传文件至指定目录
 	if err := c.SaveUploadedFile(file, file.Filename); err != nil {
 		log.Error(err)
-		api.NewResponse(c, http.StatusInternalServerError, err, nil)
+		api.NewResponse(c, http.StatusInternalServerError, err)
 	} else {
 
 		f, err := excelize.OpenFile(file.Filename)
@@ -148,7 +148,7 @@ func UploadExcel(c *gin.Context) {
 		instance, err := service.LoadToDB(f, c.DefaultQuery(`SheetName`, service.SheetName))
 		if err != nil {
 			log.Error(err)
-			api.NewResponse(c, http.StatusInternalServerError, err, nil)
+			api.NewResponse(c, http.StatusInternalServerError, err)
 		}
 		_ = os.Remove(file.Filename)
 		data := make(map[string]interface{})
