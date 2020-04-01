@@ -28,10 +28,10 @@ const (
 //物理机请求ks文件，返回渲染好的ks文件
 func GetKsFile(KSTemplate string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
-		if c.GetHeader(SerialNumber) != "" {
+		sn := c.GetHeader(SerialNumber)
+		if sn != "" && len(sn) <= 21 { //vmware的虚机序列号会超过21，华为华三的序列号都是21位
 			ks := &models.KSHeader{
-				SerialNumber: c.GetHeader(SerialNumber),
+				SerialNumber: sn,
 				Arch:         c.GetHeader(Architecture),
 				System:       c.GetHeader(SystemRelease),
 				NIC1Name:     strings.Split(c.GetHeader(ProMac1), " ")[0],

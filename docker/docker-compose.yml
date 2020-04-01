@@ -2,6 +2,7 @@ version: '3.4'
 services:
   nginx:
     image: nginx:alpine
+    container_name: pxe_nginx
     hostname: nginx
     volumes:
       - /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime:ro
@@ -16,10 +17,11 @@ services:
 
   tftp:
     image: zhangguanzhang/tftp
+    container_name: pxe_tftp
     hostname: tftp
     volumes:
       - /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime:ro
-      - ./tftp:/var/tftpboot
+      - ./tftp/:/var/tftpboot/
     command:
       ["--verbose", "--foreground", "--secure", "/var/tftpboot"]
     network_mode: "host"
@@ -30,6 +32,7 @@ services:
         max-size: 100m
   mysql:
     image: mysql:5.7.26
+    container_name: pxe_mysql
     hostname: mysql
     volumes:
       - /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime:ro

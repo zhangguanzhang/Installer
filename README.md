@@ -57,7 +57,7 @@
 ### 总结
 
 - 修改grub.cfg适应pxe场景以及ks依赖的俩boot option
-- 修改iso的`squashfs.img`增加阵列卡的cli tool命令
+- 修改iso的`squashfs.img`增加阵列卡的cli tool命令，这步不一定，也可以kickstart的%pre阶段下载cli的包安装然后做阵列
 - 编写后端，支持上传excel和根据来源序列号返回渲染是ks文件
 
 ## 实际部署步骤
@@ -98,32 +98,109 @@
 一个机柜是一个最小单位，所以一个机柜一个段
 ### 实操部署步骤:
 
-- [安装docker](https://github.com/zhangguanzhang/docker-need-to-know/blob/master/1.container-and-vm/1.2.install-docker.md)和[安装docker-compose](https://docs.docker.com/compose/install/)
-- 安装好go后，配置好环境变量开启go mod
+#### 准备docker环境
+
+- [安装docker](https://github.com/zhangguanzhang/docker-need-to-know/blob/master/1.container-and-vm/1.2.install-docker.md)
+- [安装docker-compose](https://docs.docker.com/compose/install/)
+
+#### 编译Installer
+##### 准备go
+安装go，建议1.13以上版本，从官网获取下载直链，当然懂容器的话可以容器编译，这里是在Linux上非容器编译
+```bash
+VERSION=1.14.1
+OS=linux
+ARCH=amd64
+wget https://dl.google.com/go/go$VERSION.$OS-$ARCH.tar.gz
+tar -C /usr/local -xzf go$VERSION.$OS-$ARCH.tar.gz
+# 配置环境变量
+cat <<EOF>> ~/.bashrc
+export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin/
+export GO111MODULE=on
+export GOPROXY=https://goproxy.cn,https://mirrors.aliyun.com/goproxy/,https://goproxy.io,direct
+export CGO_ENABLED=0
+EOF
+. ~/.bashrc
 ```
-$ env | grep GO
-GO111MODULE=on
-GOPROXY=https://goproxy.io
-GOPATH=xxxxx
+##### 编译
+执行`go version`有输出则往下走
 ```
-- 下载编译
+git clone https://github.com/zhangguanzhang/Installer.git  #下载文件
+cd Installer
+go build -o docker/Installer main.go # 编译可执行文件到docker目录下的main
 ```
-git clone https://github.com/zhangguanzhang/Installer.git $GOPATH/src/Installer #下载文件
-go build -o docker/main main.go # 编译可执行文件到docker目录下的main
+
+#### 准备相关文件
+##### 准备镜像相关文件
+准备目录，先进入docker目录
+```bash
+cd docker
+mkdir -p http/centos tftp mysql
 ```
-- `cd docker`确认相关目录`mkdir http/centos tftp mysql`创建好后`docker-compose up -d`启动tftp，nginx，mysql
-- `cp -a`复制centos iso的`EFI/BOOT/`下文件到tftp的根目录,更改grub.cfg(tftp里的grub.cfg文件可参考)，把iso解压到`http/centos下`，复制iso里`/images/pxeboot/`的`vmlinuz`、`initrd.img`到tftp目录里
-- 我们这6张网卡是ovs，所以ks里没用到用于ssh的管理网ip，但是代码预留了它，自行根据自己的场景写好`templates/ks.tmpl`(语法是go template)，ks的密码可以用scripts里运行`python2.7 grub-crypt.py --sha-512`生成，`./main`启动服务，并`dos2unix`转换下ks.tmpl防止windows的换行出现
-- scripts目录里有脚本，参照`machine.xlsx`的列要求写好这个excel(列的作用是在代码里的常量固定的)，然后用脚本upload去curl模拟http上传excel到我后端(url的path为localhost:8080/api/v1/ks POST请求)，后端会把excel信息导入到mysql里，也有ks的header的部分，自己带url模拟物理机请求ks(url的path为localhost:8080/api/v1/ks, GET请求)
-- 现场每个机柜交换机都配置好后dhcp和pxe部分
+启动mysql，tftp，nginx
+```bash
+docker-compose up -d
+```
+准备pxe启动文件
+
+- `cp -a`复制centos iso的`EFI/BOOT/`下文件到上面的`tftp`目录
+- 把iso解压到`http/centos`目录下，复制iso里`/images/pxeboot/`的`vmlinuz`、`initrd.img`到tftp目录里
+- 更改grub.cfg(tftp里的grub.cfg文件可参考)，里面的ip和你实际的pc部署ip要一致，因为安装阶段下载文件是nginx提供的，`http/centos`是放centos iso解开的文件，8080是installer，所以是
+```
+inst.repo=http://10.1.0.2/centos ks=http://10.1.0.2:8080/api/v1/ks
+```
+
+##### kickstart部分
+kickstart部分自己按照自己的实际写，分区，密码(ks的密码可以用`cd scripts`里运行`python2.7 grub-crypt.py --sha-512`生成)啥的。可以参考文档 https://fedoraproject.org/wiki/Anaconda/Kickstart/zh-cn
+特别是ipmi(也就是bmc)的网络和阵列要自己去测试下，如果阵列的cli没做到iso里这里可以wget cli的包安装然后做阵列，例如把阵列的cli放`http/soft`下，然后`%pre`阶段从nginx下载安装
+```
+%pre
+wget http://10.1.0.2/soft/xxx
+chmod u+x xxx
+xxx 创建阵列
+...
+...
+%end
+```
+编辑kickstart文件记得`dos2unix`它，可能windows下编辑有回车
+
+##### 启动Installer
+```
+./Installer -ks=template/ks.tmpl # 可以指定你自己的ks文件
+```
+然后再打开个终端进入docker目录往下继续
+
+##### 上传excel文件导入数据库
+
+准备填写好excel文件后，scripts目录里有脚本，参照`machine.xlsx`的列要求写好这个excel(列的作用是在代码里的常量固定的)，然后用脚本`upload.sh`去curl模拟http上传excel到我后端(url的path为localhost:8080/api/v1/ks POST请求)，后端会把excel信息导入到mysql里，例如上传excel文件`conf.xlsx`
+```
+curl -X POST localhost:8080/api/v1/upload   \
+  -H "Content-Type: multipart/form-data"  \
+  -F "file=@conf.xlsx"  
+```
+然后进入mysql查看表
+```
+# 密码是docker-compose里，默认zhangguanzhang
+docker exec -ti pxe_mysql mysql -u root -p
+> use pxe;
+> select * from machines;
+```
+表信息都有了的话看下Installer运行界面有错误信息没，没就往后继续走，有的话多半是表格的长度(例如序列化规定是21，你多了个空格)或者例如ip或者唯一值的列有值重复了。可以把mysql的machine表内容清空了改好excel后再上传
+
+##### 利用curl模拟机器请求kickstart文件
+
+`scripts`目录里有个`header.sh`脚本，自己改下序列号模拟下真实的kickstart请求，看下返回的ks内容是否渲染了机器唯一的信息
+
+
+
+##### 配置dhcp
+这个看自己的组网情况，如果你是全部都在一个设备下面，可以自己起一个软dhcp server，我这里是交换机起dhcp server，现场每个机柜交换机都配置好后dhcp和pxe部分，bootfile和next-server要写对
 ```
 [H3C-S5130-dhcp-pool-1] bootfile-name BOOTX64.EFI
 [H3C-S5130-dhcp-pool-1] next-server 10.1.0.2
-``` 
+```
+因为我pc是`10.1.0.0/24`，得写个安装段16的路由 
 - `Installer`机器配置好ip为`10.1.0.2`, 并配置`10.1.0.0/16`的路由`route add -net 10.1.0.0/16 gw 10.1.0.254 dev ens37`，我pc是虚拟机桥接，根据自己情况去配置
-- 所有物理机开机即可
-
-有条件先一台物理机测试下，可行了后续基本就都固化了
+- 所有物理机开机即可，不熟悉的话可以先一台物理机测试下，可行了后续基本就都固化了
 
 ### 可扩展的设想
 

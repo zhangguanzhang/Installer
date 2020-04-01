@@ -4,6 +4,7 @@ import (
 	"Installer/models"
 	"github.com/360EntSecGroup-Skylar/excelize/v2"
 	"github.com/jinzhu/gorm"
+	"strings"
 )
 
 //对应excel里列的字段
@@ -41,17 +42,17 @@ func LoadToDB(f *excelize.File, SheetName string) ([]string, error) {
 
 	for _, row := range rows {
 		if err = AddMachine(&models.Machine{
-			DeviceLabel: row[MachineTagName],
+			DeviceLabel: strings.Trim(row[MachineTagName], " "),
 			KSHeader: &models.KSHeader{
-				SerialNumber: row[SeriaNum],
+				SerialNumber: strings.Trim(row[SeriaNum], " "),
 			},
-			Hostname: row[HOSTNAME],
-			IPMIIP:   row[IPMIIP],
-			IPMIMask: row[IPMIMask],
-			IPMIGW:   row[IPMIGateWay],
-			MGIP:     row[MGIP],
-			MGMask:   row[MGMask],
-			MGGW:     row[MGGateway],
+			Hostname: strings.Trim(row[HOSTNAME], " "),
+			IPMIIP:   strings.Trim(row[IPMIIP], " "),
+			IPMIMask: strings.Trim(row[IPMIMask], " "),
+			IPMIGW:   strings.Trim(row[IPMIGateWay], " "),
+			MGIP:     strings.Trim(row[MGIP], " "),
+			MGMask:   strings.Trim(row[MGMask], " "),
+			MGGW:     strings.Trim(row[MGGateway], " "),
 		}); err != nil {
 			// 错误不为空则表明机器已经存在
 			instance = append(instance, row[HOSTNAME])
