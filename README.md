@@ -93,12 +93,12 @@
 +----------------+    +----------------+    +----------------+    +----------------+    +----------------+
 |     Machine    |    |     Machine    |    |     Machine    |    |     Machine    |    |     Machine    |
 +-----------------    ------------------    ------------------    ------------------    -----------------+
-    10.1.1.0/24           10.1.1.0/24           10.1.1.0/24           10.1.1.0/24           10.1.1.0/24
+    10.1.1.0/24           10.1.2.0/24           10.1.3.0/24           10.1.4.0/24           10.1.5.0/24
 ```
 一个机柜是一个最小单位，所以一个机柜一个段
 ### 实操部署步骤:
 
-- [安装docker](https://github.com/zhangguanzhang/docker-need-to-know/blob/master/untitled/an-zhuang-docker.md)和[安装docker-compose](https://docs.docker.com/compose/install/)
+- [安装docker](https://github.com/zhangguanzhang/docker-need-to-know/blob/master/1.container-and-vm/1.2.install-docker.md)和[安装docker-compose](https://docs.docker.com/compose/install/)
 - 安装好go后，配置好环境变量开启go mod
 ```
 $ env | grep GO
