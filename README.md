@@ -123,13 +123,17 @@ export CGO_ENABLED=0
 EOF
 . ~/.bashrc
 ```
+执行`go version`有输出则往下走
+
 ##### 编译
 
-我们这标准都是八张网卡，所以代码里也是八张的逻辑，为了避免少于8张网卡会触发我代码的panic。所以我代码目前是只留一个网卡的逻辑，自行按照自己实际去取消代码`api/v1/ks.go里的39-52行`的注释，我代码里录入mac地址是为了以后的cmdb，所以mac这部分录入不是那么重要。例如你两批机器6张合8张网卡，你可以留到nic6的部分就行了。
-
-执行`go version`有输出则往下走
 ```bash
 git clone https://github.com/zhangguanzhang/Installer.git  #下载文件
+```
+
+我们这标准都是八张网卡，所以代码里也是八张的逻辑，为了避免少于8张网卡会触发我代码的panic。所以我代码目前是只留一个网卡的逻辑，自行按照自己实际去取消代码`api/v1/ks.go里的39-52行`的注释，我代码里录入mac地址是为了以后的cmdb，所以mac这部分录入不是那么重要。例如你两批机器分别是6张和8张网卡，你可以留到nic6的部分就行了。
+
+```bash
 cd Installer
 go build -o docker/Installer main.go # 编译可执行文件到docker目录下
 ```
