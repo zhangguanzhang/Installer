@@ -112,11 +112,11 @@
 VERSION=1.14.1
 OS=linux
 ARCH=amd64
-wget https://dl.google.com/go/go$VERSION.$OS-$ARCH.tar.gz
+wget https://dl.google.com/go/go$VERSION.$OS-$ARCH.tar.gz #下载多半需要梯子
 tar -C /usr/local -xzf go$VERSION.$OS-$ARCH.tar.gz
 # 配置环境变量
 cat <<EOF>> ~/.bashrc
-export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin/
+export PATH=$PATH:/usr/local/go/bin
 export GO111MODULE=on
 export GOPROXY=https://goproxy.cn,https://mirrors.aliyun.com/goproxy/,https://goproxy.io,direct
 export CGO_ENABLED=0
