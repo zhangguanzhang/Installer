@@ -100,6 +100,8 @@
 
 #### 准备docker环境
 
+准备一台centos7.6+系统
+
 - [安装docker](https://github.com/zhangguanzhang/docker-need-to-know/blob/master/1.container-and-vm/1.2.install-docker.md)
 - [安装docker-compose](https://docs.docker.com/compose/install/)
 
@@ -123,10 +125,10 @@ EOF
 ```
 ##### 编译
 执行`go version`有输出则往下走
-```
+```bash
 git clone https://github.com/zhangguanzhang/Installer.git  #下载文件
 cd Installer
-go build -o docker/Installer main.go # 编译可执行文件到docker目录下的main
+go build -o docker/Installer main.go # 编译可执行文件到docker目录下
 ```
 
 #### 准备相关文件
@@ -140,11 +142,11 @@ mkdir -p http/centos tftp mysql
 ```bash
 docker-compose up -d
 ```
-准备pxe启动文件
+准备pxe启动文件，系统先把安装的iso挂载了
 
 - `cp -a`复制centos iso的`EFI/BOOT/`下文件到上面的`tftp`目录
 - 把iso解压到`http/centos`目录下，复制iso里`/images/pxeboot/`的`vmlinuz`、`initrd.img`到tftp目录里
-- 更改grub.cfg(tftp里的grub.cfg文件可参考)，里面的ip和你实际的pc部署ip要一致，因为安装阶段下载文件是nginx提供的，`http/centos`是放centos iso解开的文件，8080是installer，所以是
+- 更改grub.cfg(tftp里的`grub.cfg.tmpl`文件可参考)，里面的ip和你实际的pc部署ip要一致，因为安装阶段下载文件是nginx提供的，`http/centos`是放centos iso解开的文件，8080是installer，所以是
 ```
 inst.repo=http://10.1.0.2/centos ks=http://10.1.0.2:8080/api/v1/ks
 ```
@@ -161,10 +163,11 @@ xxx 创建阵列
 ...
 %end
 ```
+
 编辑kickstart文件记得`dos2unix`它，可能windows下编辑有回车
 
 ##### 启动Installer
-```
+```bash
 ./Installer -ks=template/ks.tmpl # 可以指定你自己的ks文件
 ```
 然后再打开个终端进入docker目录往下继续
@@ -172,7 +175,7 @@ xxx 创建阵列
 ##### 上传excel文件导入数据库
 
 准备填写好excel文件后，scripts目录里有脚本，参照`machine.xlsx`的列要求写好这个excel(列的作用是在代码里的常量固定的)，然后用脚本`upload.sh`去curl模拟http上传excel到我后端(url的path为localhost:8080/api/v1/ks POST请求)，后端会把excel信息导入到mysql里，例如上传excel文件`conf.xlsx`
-```
+```bash
 curl -X POST localhost:8080/api/v1/upload   \
   -H "Content-Type: multipart/form-data"  \
   -F "file=@conf.xlsx"  
