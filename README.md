@@ -100,7 +100,7 @@
 
 #### 准备docker环境
 
-准备一台centos7.6+系统
+准备一台centos7.6+系统，有条件单独机器也行，我是笔记本虚机桥接网口，笔记本网口接核心上
 
 - [安装docker](https://github.com/zhangguanzhang/docker-need-to-know/blob/master/1.container-and-vm/1.2.install-docker.md)
 - [安装docker-compose](https://docs.docker.com/compose/install/)
@@ -196,7 +196,7 @@ docker exec -ti pxe_mysql mysql -u root -p
 > use pxe;
 > select * from machines;
 ```
-表信息都有了的话看下Installer运行界面有错误信息没，没就往后继续走，有的话多半是表格的长度(例如序列号规定是21，你多了个空格)或者例如ip或者唯一值的列有值重复了。可以把mysql的machine表内容清空了改好excel后再上传
+表信息都有了的话看下Installer运行界面有错误信息没，没就往后继续走，有的话多半是值的长度(例如序列号规定是21，你22位了)或者例如ip或者唯一值的列有值重复了。可以把mysql的machine表内容清空了改好excel后再上传
 
 ##### 利用curl模拟机器请求kickstart文件
 
