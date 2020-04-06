@@ -38,13 +38,11 @@ func main() {
 		log.Fatalf("kickstart template file %s %v", *ks, err)
 	}
 
-
 	if err := service.DBInit(*con, *dbInfo); err != nil {
 		log.Fatal(err)
 	}
 
 	defer service.DBClose()
-
 
 	Router := router.InitRouter(*ks)
 	if err := Router.Run(":" + strconv.Itoa(*port)); err != nil {

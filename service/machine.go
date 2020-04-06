@@ -2,8 +2,10 @@ package service
 
 import (
 	"Installer/models"
+	"errors"
 	"github.com/360EntSecGroup-Skylar/excelize/v2"
 	"github.com/jinzhu/gorm"
+	log "github.com/sirupsen/logrus"
 	"strings"
 )
 
@@ -55,85 +57,94 @@ func LoadToDB(f *excelize.File, SheetName string) ([]string, error) {
 			MGGW:     strings.Trim(row[MGGateway], " "),
 		}); err != nil {
 			// 错误不为空则表明机器已经存在
-			instance = append(instance, row[HOSTNAME])
+			instance = append(instance, row[SeriaNum])
 		}
 	}
 	return instance, nil
 }
 
-func GetMachinesTotal(data map[string]interface{}) (int, error) {
+func GetStatus() ([]models.Status, error) {
 	var (
-		count int
-		err error
+		result []models.Status
+		err    error
 	)
 
-	if len(data) == 0 {
-		err = db.Model(&models.Machine{}).Count(&count).Error
-	} else {
-		err = db.Model(&models.Machine{}).Where(data).Count(&count).Error
-	}
+	err = db.Table("machines").Select([]string{
+		"SerialNumber",
+		"Arch",
+		"System",
+		"Count",
+		"InstallStatus",
+	}).Find(&result).Error
 	if err != nil {
-		return 0, err
+		log.Errorf("GetAllSN err: %s", err.Error())
+		return nil, err
 	}
-	return count, nil
+
+	return result, nil
 }
 
-func GetMachines(data map[string]interface{}) ([]models.Machine, error) {
-	var err error
-	var instance []models.Machine
-	err = db.Where(data).Find(&instance).Error
-	if err != nil {
+func GetAllSN() ([]string, error) {
+	var result []string
+
+	if err := db.Model(&models.Machine{}).Pluck("SerialNumber", &result).Error; err != nil {
+		log.Errorf("GetAllSN err: %s", err.Error())
 		return nil, err
-	} else {
-		return instance, nil
 	}
+
+	return result, nil
+}
+
+func GetMachines(data map[string]interface{}) ([]models.Machine, int, error) {
+	var (
+		count int
+		err   error
+	)
+	var instances []models.Machine
+	err = db.Model(&models.Machine{}).Where(data).Find(&instances).Count(&count).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Errorf("GetMachines %v err: %s", data, err.Error())
+		return nil, 0, err
+	}
+
+	return instances, count, nil
 }
 
 func GetMachine(SN string) (*models.Machine, error) {
 	var err error
 	var instance models.Machine
 	err = db.Model(&models.Machine{}).Where("SerialNumber = ?", SN).First(&instance).Error
-	if err != nil {
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Errorf("sn %s search err: %s", SN, err.Error())
 		return nil, err
-	} else {
-		return &instance, nil
 	}
 
+	return &instance, nil
 }
-
 
 func AddMachine(m *models.Machine) error {
 	return db.Create(m).Error
 }
 
-
 func UpdateMachine(m *models.Machine) error {
-	var (
-		count int
-		err error
-	)
-	err = db.Model(&models.Machine{}).Where("SerialNumber = ?", m.SerialNumber).Count(&count).Updates(m).Error
-	if err != nil {
+	var err error
+
+	err = db.Model(&models.Machine{}).Where("SerialNumber = ?", m.SerialNumber).Updates(m).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Errorf("instance %v update err: %s", m, err.Error())
 		return err
-	}
-	if count != 1 {
-		return gorm.ErrRecordNotFound
 	}
 	return nil
 }
 
+func DeleteMachine(sn string) (int64, error) {
 
-func DeleteMachine(SerialNumber string) error {
-	var (
-		count int
-		err error
-	)
-	err = db.Where("SerialNumber = ?", SerialNumber).Unscoped().Count(&count).Delete(models.Machine{}).Error
-	if err != nil {
-		return err
+	DB := db.Where("SerialNumber = ?", sn).Unscoped().Delete(&models.Machine{})
+
+	if DB.Error != nil && !errors.Is(DB.Error, gorm.ErrRecordNotFound) {
+		log.Errorf("sn %v dalete err: %s", sn, DB.Error)
+		return 0, DB.Error
 	}
-	if count != 1 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
+	log.Println(DB.RowsAffected)
+	return DB.RowsAffected, nil
 }

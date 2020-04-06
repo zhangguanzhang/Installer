@@ -12,7 +12,7 @@ var db *gorm.DB
 func DBInit(userPass, hostAndPortAndDBName string) error {
 	var err error
 	conInfo := strings.Split(hostAndPortAndDBName, "@")
-	db, err = gorm.Open("mysql", userPass + "@tcp(" + conInfo[0] + ")/" + conInfo[1] + "?charset=utf8&parseTime=True&loc=Local")
+	db, err = gorm.Open("mysql", userPass+"@tcp("+conInfo[0]+")/"+conInfo[1]+"?charset=utf8&parseTime=True&loc=Local")
 	if err != nil {
 		return err
 	}
@@ -26,9 +26,10 @@ func DBInit(userPass, hostAndPortAndDBName string) error {
 		}
 	}
 
+	db.LogMode(false)
+
 	return db.AutoMigrate(&models.Machine{}).Error
 }
-
 
 func DBClose() error {
 	return db.Close()

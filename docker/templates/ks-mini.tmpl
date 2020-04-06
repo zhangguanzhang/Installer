@@ -1,0 +1,146 @@
+#version=RHEL7
+# System authorization information
+auth --enableshadow --passalgo=sha512
+# Root password
+rootpw --iscrypted $6$aQd7KMc4vTVvoOrd$vdcUdZXS47JJi1ysoCfsJjYWqY.xAuv.5T6nugT1egBlh5cVjMqeYMAzWmnjViUQ1CiL3BfG9p7Z7A5JRCquJ/
+
+# Use CDROM installation media
+#cdrom
+
+# Run the Setup Agent on first boot
+firstboot --disable
+
+# Keyboard layouts
+keyboard --vckeymap=us --xlayouts='us'
+
+# System language
+lang en_US.UTF-8
+
+# Use text mode install
+#text
+
+# Firewall configuration
+firewall --disabled
+
+# Accept Eula
+eula --agreed
+
+#指定从哪里获取安装的软件源,是iso解开后从nginx的容器那的下载地址
+url --url="http://10.1.0.2/centos"
+
+# Network information hostname和管理网的ip
+network  --hostname={{.Hostname}}
+network --device=eth0 --bootproto=static --ip={{.MGIP}}  --netmask={{.MGMask}} --gateway={{.MGGw}} --nameserver=114.114.114.114
+
+# SELinux configuration
+selinux --disabled
+
+# System timezone
+timezone Asia/Shanghai --isUtc
+# X Window System configuration information
+#xconfig  --startxonboot
+skipx
+
+# Clear the Master Boot Record
+#zerombr
+
+
+#自行写分区规则
+#autopart --type=lvm
+#clearpart --all --initlabel
+#part /boot --fstype xfs --size=500
+#part pv.01 --size=1 --grow
+#volgroup centos pv.01
+#logvol swap --vgname=centos --size=8192 --name=swap
+#logvol /    --vgname=centos --size=100000 --name=root
+
+
+# PREINSTALL SECTION
+# HERE ARE COMMANDS THAT WILL BE LAUNCHED BEFORE
+# INSTALLATION PROCESS ITSELF
+# %pre阶段可以不像我，可以直接下载阵列的cli命令后然后做阵列，ipmi(也就是bmc)也记得写
+%pre
+#!/bin/bash
+
+arcconf getconfig 1 ld | grep -qw 'No logical'
+if [ "$?" -eq 0 ];then
+
+    #获取实际硬盘的Channel id存成数组:0,1  0,0  取最后两个槽位做系统盘的raid1
+    hardDiskChannelIDArray=( $(arcconf getconfig 1 pd | grep Channel | tac | awk -F'[: ()]+' 'NR!=1&&NR<4{print $6}') )
+    arcconf task start 1 device all initialize noprompt  #初始化所有硬盘
+    #              控制器id               容量  raid级别
+    arcconf create    1     logicaldrive Wcache WBB max    1   ${hardDiskChannelIDArray[@]//,/ }  noprompt
+
+fi
+
+#该处是ipmitool设置带外的网络信息
+{{if and .IPMIIP .IPMIMask .IPMIGw}}
+    # 获取eth1的信息,该字段为8
+    ipmitool raw 0x0c 0x02   0x08   0x04 0x00 0x00 | grep -qw '02'   # dhcp
+    if [ "$?" -eq 0 ];then
+        ipmitool lan set 8 ipsrc static
+    fi
+    ipmitool lan set 8 ipaddr {{.IPMIIP}}
+    ipmitool lan set 8 netmask {{.IPMIMask}}
+    ipmitool lan set 8 defgw ipaddr {{.IPMIGw}}
+    #ipmitool chassis bootdev disk options=efiboot,persistent # force boot from desik, and set the mode to uefi
+    #  ipmitool raw 0x00 0x08 0x05  0xE0 0x08  0x00 0x00 0x00 #uefi启动,强制boot from disk
+{{end}}
+
+#后面也可以可以自己写些其他的
+
+%end
+
+%post
+#!/bin/bash
+
+#该段是为了在数据库里记录完成安装的次数的，正常安装走完了那mysql表里就加一
+if [ -r /sys/class/dmi/id/product_serial ];then
+    curl -X POST -H "X-System-Serial-Number:$(cat /sys/class/dmi/id/product_serial)" http://10.1.0.2:8080/api/v1/ks
+fi
+#后面也可以可以自己写些其他的
+
+%end
+
+
+%packages
+@base
+@core
+@debugging
+@cvk-packages
+#@desktop-debugging
+#@directory-client
+#@fonts
+#@gnome-desktop
+#@guest-agents
+#@guest-desktop-agents
+#@hardware-monitoring
+#@input-methods
+#@large-systems
+#@mariadb
+#@mongodb
+#@multimedia
+#@network-file-system-client
+#@openstack-ceilometer
+#@openstack-cinder
+#@openstack-dashboard
+#@openstack-glance
+#@openstack-keystone
+#@openstack-neutron-compute
+#@openstack-neutron-server
+#@openstack-nova
+#@openstack-utils
+#@performance
+#@perl-runtime
+#@postgresql
+#@postgresql-client
+#@rabbitmq
+#@x11
+#@saltstack-master
+#@saltstack-minion
+#@cobbler
+%end
+
+
+reboot --eject
+

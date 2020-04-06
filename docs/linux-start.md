@@ -23,7 +23,7 @@ menuentry 'Install CentOS 7' --class fedora --class gnu-linux --class gnu --clas
   
 ![install-menu](https://raw.githubusercontent.com/zhangguanzhang/Image-Hosting/master/machineInstaller/007.png)
 
-- 6: 图片我是截图的带有ks启动选项的截图，没有指定ks的话就没有用网卡retry获取ks文件的信息，启动到`dracut initquenue hook`的时候进入`stage2`阶段，查看安装介质的根目录下有没有文件`.treeinfo`，正常是下面的内容，即使没有这个文件也是加载`/LiveOS/squashfs.img`这个rootfs
+- 6: 图片我是截图的带有ks启动选项的截图，没有指定ks的话就没有用网卡retry获取ks文件的信息，启动到`dracut initquenue hook`的时候进入`stage2`阶段，查看安装介质的根目录下有没有文件`.treeinfo`，正常是下面的内容，也就是没有这个文件从而加载`/LiveOS/squashfs.img`这个rootfs
 
 ```
 [general]
@@ -48,7 +48,7 @@ kernel = images/pxeboot/vmlinuz
 initrd = images/pxeboot/initrd.img
 ```
 - 7: 然后就是我们看到的什么选择时区和分区root密码的那个图形界面了，ks是在这个阶段执行的，如果需要看log我们可以`ctrl+alt+F2-F7`进tty去看日志
-> 我们也可以`ip addr add`给此时的机器配置ip然后配置路由，可以scp其他机器上的文件过来，记住这点
+> 我们也可以`ip addr add`给此时的机器配置ip然后配置路由，可以scp其他机器上的文件过来，记住这点，可以用来测试出阵列命令配置raid的shell写法
 
 ## 修改iso要注意的坑
 

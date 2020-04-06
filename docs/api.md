@@ -1,10 +1,29 @@
 
 # PXE
 
+## sn
+
+- `GET` `/api/v1/sns` 返回所有序列号和total
+```json
+{
+    "code": 200,
+    "data": {
+        "results": [
+            "210200A00QH19700xxx1",
+            "210200A00QH19700xxx2",
+            "210200A00QH19700xxx3",
+            "210200A00QH19700xxx4",
+            "210200A00QH19700xx11"
+        ],
+        "total": 5
+    }
+}
+```
+
 ## ks
 
 - `GET` `/api/v1/ks` header里带上信息获取kickstart文件，因为接收是文件，所以这里不是标准的接口，可以用脚本里去模拟
-```
+```bash
 curl -s -H 'Accept: [*/*]' \
   -H 'User-Agent: curl/7.29.0' \
   -H 'X-Anaconda-Architecture: x86_64' \
@@ -19,20 +38,49 @@ curl -s -H 'Accept: [*/*]' \
   -H 'X-Rhn-Provisioning-Mac-7: ens2f1 3c:f5:cc:91:1e:4a' \
   -H 'X-System-Serial-Number: 210200A00QH185002000' localhost:8080/api/v1/ks
 ```
+每请求一次会记录一次`Count`
 
-- `POST` `/api/v1/ks` ks的post阶段发送请求标明安装结束
-```
+- `POST` `/api/v1/ks` ks的post阶段发送请求标明安装结束，下面为ks的模板里`%post`阶段上报状态写法
+```bash
 if [ -r /sys/class/dmi/id/product_serial ];then
  curl -X POST -H "X-System-Serial-Number:$(cat /sys/class/dmi/id/product_serial)" http://10.1.0.2:8080/api/v1/ks
 fi
 ```
 
+## status
+
+`GET /api/v1/status`返回当前库里机器的状态信息, 例如：
+```json
+{
+    "code": 200,
+    "data": {
+        "results": [
+            {
+                "SerialNumber": "210200A00QH19700xxx1",
+                "Arch": "x86_64",
+                "System": "CentOS Linux",
+                "Count": 1,
+                "InstallStatus": 1
+            },
+            {
+                "SerialNumber": "210200A00QH19700xxx2",
+                "Arch": "",
+                "System": "",
+                "Count": 0,
+                "InstallStatus": 0
+            }
+        ],
+        "total": 2
+    }
+}
+```
+
 ## machine
 
 ### 查询
-- `GET` `/api/v1/machine` 返回json
+- `GET` `/api/v1/machines` 返回json
   - 不带url参数默认返回所有机器
-  - `/api/v1/machine?list=ColumnNames`返回表的列名
+  - `/api/v1/machines?list=ColumnNames`返回表的列名
 ```json
 {
   "code": 200,
@@ -52,7 +100,7 @@ fi
   }
 }
 ```
-  - 也可以用列名+值来查询一个或者多个 `curl -sX GET "http://localhost:8080/api/v1/machine?MGGW=10.124.24.254" -H "accept: application/json"  | jq .`
+  - 也可以用列名+值来查询一个或者多个 `curl -sX GET "http://localhost:8080/api/v1/machines?MGGW=10.124.24.254" -H "accept: application/json"  | jq .`
 
 ```json
 {
@@ -144,7 +192,7 @@ fi
 ### 更新
 
 - `PUT` `/api/v1/machine/:sn` model的Machine里的属性名就是key名，可以发一部分更新，例如更新`210200A00QH197000769`的Arch为`x86_64`
-```
+```json
 {
 	"Arch": "x86_64"
 }

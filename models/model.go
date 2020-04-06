@@ -1,9 +1,15 @@
 package models
 
 import (
-	"github.com/jinzhu/gorm"
 	"reflect"
+	"time"
 )
+
+type Model struct {
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt *time.Time `sql:"index"`
+}
 
 //信息分两部分导入更新的，所以ks的header里暂时不写unique
 type Machine struct {
@@ -35,7 +41,7 @@ type Machine struct {
 
 	*KSHeader
 	InstallStatus uint8 `gorm:"column:InstallStatus;default:0" json:"InstallStatus,omitempty"` //安装状态，ks里的post阶段发请求更新
-	gorm.Model
+	Model
 }
 
 type ArrayBoard struct {
@@ -43,12 +49,13 @@ type ArrayBoard struct {
 	ArrayBoardName string `gorm:"column:ArrayBoardName" json:"ArrayBoardName,omitempty"`
 }
 
-//ks信息是安装的时候带header上来，在人为写excel上传导入数据库之后(此时人为写的表格里没有mac地址)，如果mac地址字段加unique则excel的内容第二行就重复为''报错了
+//ks信息是安装的时候带header上来，在人为写excel上传导入数据库之后(此时人为写的表格里没有mac地址)
+// 避免零值重复，mac地址字段不能用unique属性
 type KSHeader struct {
 	//序列号,华三序列号20位
-	SerialNumber string `gorm:"size:20;column:SerialNumber;unique;not null" json:"SerialNumber"`
-	Arch         string `gorm:"size:7;column:Arch" json:"Arch,omitempty"`
-	System       string `gorm:"size:20;column:System" json:"System,omitempty"`
+	SerialNumber string `gorm:"size:20;column:SerialNumber;unique;not null;primary_key" json:"SerialNumber" header:"X-System-Serial-Number"`
+	Arch         string `gorm:"size:7;column:Arch" json:"Arch,omitempty" header:"X-Anaconda-Architecture"`
+	System       string `gorm:"size:20;column:System" json:"System,omitempty" header:"X-Anaconda-System-Release"`
 	NIC1Name     string `gorm:"size:10;column:NIC1Name"  json:"NIC1Name,omitempty"`
 	NIC1MAC      string `gorm:"size:17;column:NIC1MAC"  json:"NIC1MAC,omitempty"`
 	NIC2Name     string `gorm:"size:10;column:NIC2Name"  json:"NIC2Name,omitempty"`
@@ -65,15 +72,15 @@ type KSHeader struct {
 	NIC7MAC      string `gorm:"size:17;column:NIC7MAC"  json:"NIC7MAC,omitempty"`
 	NIC8Name     string `gorm:"size:10;column:NIC8Name"  json:"NIC8Name,omitempty"`
 	NIC8MAC      string `gorm:"size:17;column:NIC8MAC"  json:"NIC8MAC,omitempty"`
-	Count        uint8  `gorm:"column:Count;default:0"  json:"Count,omitempty"`
+	//不在header里，主要是kickstart的请求计数
+	Count uint8 `gorm:"column:Count;default:0"  json:"Count,omitempty"`
 }
-
 
 func (m *Machine) IsEmpty() bool {
 	return reflect.DeepEqual(m, &Machine{})
 }
 
-
+//ks模板
 type KSTemplateInfo struct {
 	Hostname     string
 	MGIP         string
@@ -84,4 +91,13 @@ type KSTemplateInfo struct {
 	IPMIGw       string
 	SerialNumber string //如果ip和mask为空则在模板里作为hostname
 	RequsetHost  string
+}
+
+type Status struct {
+	SerialNumber string `gorm:"column:SerialNumber" json:"SerialNumber"`
+	Arch         string `gorm:"column:Arch" json:"Arch"`
+	System       string `gorm:"column:System" json:"System"`
+	Count        uint8  `gorm:"column:Count" json:"Count"`
+	//安装状态，ks里的post阶段发请求更新
+	InstallStatus uint8 `gorm:"column:InstallStatus" json:"InstallStatus"`
 }

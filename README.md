@@ -131,7 +131,7 @@ EOF
 git clone https://github.com/zhangguanzhang/Installer.git  #下载文件
 ```
 
-我们这标准都是八张网卡，所以代码里也是八张的逻辑，为了避免少于8张网卡会触发我代码的panic。所以我代码目前是只留一个网卡的逻辑，自行按照自己实际去取消代码`api/v1/ks.go里的39-52行`的注释，我代码里录入mac地址是为了以后的cmdb，所以mac这部分录入不是那么重要。例如你两批机器分别是6张和8张网卡，你可以留到nic6的部分就行了。
+我们这标准都是八张网卡，所以代码里也是八张的逻辑，为了避免少于8张网卡会触发我代码的panic。所以我代码目前是只留一个网卡的逻辑，自行按照自己实际去取消代码`api/v1/ks.go里的40-52行`的注释，我代码里录入mac地址是为了以后的cmdb，所以mac这部分录入不是那么重要。例如你两批机器分别是6张和8张网卡，你可以留到nic6的部分就行了。
 
 ```bash
 cd Installer
@@ -143,7 +143,7 @@ go build -o docker/Installer main.go # 编译可执行文件到docker目录下
 准备目录，先进入docker目录
 ```bash
 cd docker
-mkdir -p http/centos tftp mysql
+mkdir -p http/centos tftp mysql http/soft
 ```
 启动mysql，tftp，nginx
 ```bash
@@ -151,12 +151,14 @@ docker-compose up -d
 ```
 准备pxe启动文件，系统先把安装的iso挂载了
 
-- `cp -a`复制centos iso的`EFI/BOOT/`下文件到上面的`tftp`目录
-- 把iso解压到`http/centos`目录下，复制iso里`/images/pxeboot/`的`vmlinuz`、`initrd.img`到tftp目录里
-- 更改grub.cfg(tftp里的`grub.cfg.tmpl`文件可参考)，里面的ip和你实际的pc部署ip要一致，因为安装阶段下载文件是nginx提供的，`http/centos`是放centos iso解开的文件，8080是installer，所以是
+- `cp -a`复制centos iso的`EFI/BOOT/`下文件到上面的`tftp/`目录
+- 把iso解压到`http/centos/`目录下，复制iso里`/images/pxeboot/`的`vmlinuz`、`initrd.img`到tftp目录里
+- 如果你不想改iso的话可以在`http/soft/`下放入安装过程中下载和安装运行做硬raid的命令的安装包啥的
+- 更改grub.cfg(tftp里的`grub.cfg.tmpl`文件可参考)，里面的ip和你实际的pc部署ip要一致，因为安装阶段下载文件是nginx提供的，`http/centos/`是放centos iso解开的文件，8080是installer，所以是
 ```
 inst.repo=http://10.1.0.2/centos ks=http://10.1.0.2:8080/api/v1/ks
 ```
+不要加参数`ksdevice=xxx`指定ks请求指定网卡，除非你明确现场连线正确，centos7是会去尝试每张网卡的
 
 ##### kickstart部分
 kickstart部分自己按照自己的实际写，分区，密码(ks的密码可以用`cd scripts`里运行`python2.7 grub-crypt.py --sha-512`生成)啥的。可以参考文档 https://fedoraproject.org/wiki/Anaconda/Kickstart/zh-cn
@@ -170,18 +172,18 @@ xxx 创建阵列
 ...
 %end
 ```
-
+`ks-mini.tmpl`文件是大概的列出了下模板的变量和基础设置，两个文件都参考下
 编辑kickstart文件记得`dos2unix`它，可能windows下编辑有回车
 
 ##### 启动Installer
 ```bash
-./Installer -ks=template/ks.tmpl # 可以指定你自己的ks文件
+./Installer -ks=template/ks.tmpl # 指定你自己的ks文件
 ```
-然后再打开个终端进入docker目录往下继续
+然后再打开个终端进入docker目录往下继续,Installer提供的http接口看文件`docs/api.md`文件
 
 ##### 上传excel文件导入数据库
 
-准备填写好excel文件后，scripts目录里有脚本，参照`machine.xlsx`的列要求写好这个excel(列的作用是在代码里的常量固定的)，然后用脚本`upload.sh`去curl模拟http上传excel到我后端(url的path为localhost:8080/api/v1/ks POST请求)，后端会把excel信息导入到mysql里，例如上传excel文件`conf.xlsx`
+准备填写好excel文件后，scripts目录里有脚本，参照`machines.xlsx`的列要求写好这个excel(列的作用是在代码里的常量固定的)，然后用脚本`upload.sh`去curl模拟http上传excel到我后端(url的path为localhost:8080/api/v1/ks POST请求)，后端会把excel信息导入到mysql里，例如上传excel文件`conf.xlsx`
 ```bash
 curl -X POST localhost:8080/api/v1/upload   \
   -H "Content-Type: multipart/form-data"  \
@@ -194,7 +196,7 @@ docker exec -ti pxe_mysql mysql -u root -p
 > use pxe;
 > select * from machines;
 ```
-表信息都有了的话看下Installer运行界面有错误信息没，没就往后继续走，有的话多半是表格的长度(例如序列化规定是21，你多了个空格)或者例如ip或者唯一值的列有值重复了。可以把mysql的machine表内容清空了改好excel后再上传
+表信息都有了的话看下Installer运行界面有错误信息没，没就往后继续走，有的话多半是表格的长度(例如序列号规定是21，你多了个空格)或者例如ip或者唯一值的列有值重复了。可以把mysql的machine表内容清空了改好excel后再上传
 
 ##### 利用curl模拟机器请求kickstart文件
 

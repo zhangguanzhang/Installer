@@ -10,44 +10,34 @@ var (
 	NotFound = errors.New("NotFound")
 )
 
-
+type CommonResp struct {
+	Code    int         `json:"code"`
+	Message string      `json:"message,omitempty"`
+	Data    interface{} `json:"data,omitempty"`
+}
 
 // Response setting gin.JSON
-func NewResponse(ctx *gin.Context, httpCode int, info ...interface{}) {
-	var (
-		msg  = "ok"
-		data interface{} = nil
-	)
-
-	if httpCode != http.StatusOK {
-		msg = "not ok"
-	}
-	if len(info) >= 1 && info[0] != nil {
-		switch v := info[0].(type) {
-		case error:
-			msg = v.Error()
-		case string:
-			msg = v
-		}
-	}
-	if len(info) >= 2 && info[1] != nil {
-		data = info[1]
-	}
-
-	ctx.JSON(httpCode, Response{
-		Code:    httpCode,
+func Response(ctx *gin.Context, httpStatus int, code int, data interface{}, msg string) {
+	ctx.JSON(httpStatus, CommonResp{
+		Code:    code,
 		Message: msg,
-		Data: data,
+		Data:    data,
 	})
 }
 
-
-type Response struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data interface{} `json:"data,omitempty"`
+func Success(ctx *gin.Context, data interface{}, msg string) {
+	Response(ctx, http.StatusOK, 200, data, msg)
 }
 
+func Error(ctx *gin.Context, httpStatus int, msg string) {
+	Response(ctx, httpStatus, httpStatus, nil, msg)
+}
+
+//ks有错误的话必须返回非200状态码,请勿使用此回应ks
+//状态码为ok，但是回应错误信息
+func Fail(ctx *gin.Context, msg string) {
+	Response(ctx, http.StatusOK, 200, nil, msg)
+}
 
 //返回404
 func NoResponse(c *gin.Context) {
@@ -56,4 +46,3 @@ func NoResponse(c *gin.Context) {
 		"error":  "404, page not exists!",
 	})
 }
-

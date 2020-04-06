@@ -53,16 +53,21 @@ func GetKsFile(KSTemplate string) gin.HandlerFunc {
 			}
 			err := service.FillNicInfo(ks)
 			if err != nil {
-				log.Printf("service.FillNicInfo: %s", err)
-				api.NewResponse(c, http.StatusInternalServerError, "something wrong")
+				log.Errorf("service.FillNicInfo: %s", err)
+				api.Error(c, http.StatusInternalServerError, "something wrong")
 				return
 			}
-			m, err := service.SearchKSInfo(c.GetHeader(SerialNumber))
+			m, err := service.GetMachine(sn)
 			if err != nil {
-				log.Printf("service.SearchKSInfo: %s|SN: %s", err, ks.SerialNumber)
-				api.NewResponse(c, http.StatusInternalServerError, "something wrong")
+				api.Error(c, http.StatusInternalServerError, "something wrong")
 				return
 			}
+			if m.SerialNumber == "" {
+				//此处记录未录入库发起ks请求的机器的序列号
+				log.Warnf("record not found %v", sn)
+				api.Error(c, http.StatusInternalServerError, "record not found")
+			}
+
 			info := &models.KSTemplateInfo{
 				Hostname: m.Hostname,
 				IPMIGw:   m.IPMIGW,
@@ -74,26 +79,28 @@ func GetKsFile(KSTemplate string) gin.HandlerFunc {
 			}
 
 			t1, _ := template.ParseFiles(KSTemplate)
-			if err = t1.Execute(c.Writer, info); err != nil {
+			if err = t1.Execute(c.Writer, info); err != nil { // 返回渲染的ks文件
 				log.Errorf("template err:%v", err)
 			}
 			return
 
-		} else {
-			log.Println(c.Request.Header)
-			api.NewResponse(c, http.StatusBadRequest, "not a kickstart request!")
 		}
-
+		log.Println(c.Request.Header)
+		api.Error(c, http.StatusBadRequest, "Not a kickstart request")
 	}
 }
 
-
-//ks的%post阶段请求，更改数据库字段表明安装完成
+//ks的%post阶段请求，更改数据库字段count+1表明安装完成
 func UpdateStatusFromKs(c *gin.Context) {
-
-	if err := service.KsPostStatus(c.GetHeader(SerialNumber)); err != nil {
-		log.Error(err)
-		api.NoResponse(c)
+	sn := c.GetHeader(SerialNumber)
+	if sn == "" {
+		api.Error(c, http.StatusBadRequest, "Not a kickstart %post request")
+		return
 	}
-	api.NewResponse(c, http.StatusOK)
+	if err := service.KsPostStatus(sn); err != nil {
+		log.Error(err)
+		api.Error(c, http.StatusForbidden, "Not an internal machine")
+		return
+	}
+	api.Success(c, nil, "ok")
 }

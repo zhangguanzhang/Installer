@@ -5,7 +5,6 @@ import (
 	"Installer/models"
 	"Installer/service"
 	"encoding/json"
-	"fmt"
 	"github.com/360EntSecGroup-Skylar/excelize/v2"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -13,6 +12,17 @@ import (
 	"os"
 )
 
+func GetStatus(c *gin.Context) {
+	data := make(map[string]interface{})
+	results, err := service.GetStatus()
+	if err != nil {
+		api.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	data["total"] = len(results)
+	data["results"] = results
+	api.Success(c, data, "")
+}
 
 // @Summary Get machines
 // @Produce  json
@@ -30,101 +40,128 @@ func GetMachines(c *gin.Context) {
 	if listTarget == `ColumnNames` {
 		//返回表的所有字段
 		data["ColumnNames"] = service.ReturnColumnNames()
-		api.NewResponse(c, http.StatusOK, nil, data)
-	} else {
+		api.Success(c, data, "")
+		return
+	}
 
-		paramMap := make(map[string]interface{}, 0)
-		for k, v := range c.Request.URL.Query() {
-			if len(v) == 1 && len(v[0]) != 0 {
-				paramMap[k] = v[0]
-			} else {
-				api.NewResponse(c, http.StatusBadRequest)
-				return
-			}
-		}
-		total, _ := service.GetMachinesTotal(paramMap)
-
-		result, err := service.GetMachines(paramMap)
-		if err != nil {
-			api.NewResponse(c, http.StatusInternalServerError, err, data)
+	paramMap := make(map[string]interface{}, 0)
+	for k, v := range c.Request.URL.Query() {
+		if len(v) == 1 && len(v[0]) != 0 { //key=value
+			paramMap[k] = v[0]
+		} else {
+			api.Error(c, http.StatusBadRequest, "Bad Request")
 			return
 		}
-		data["total"] = total
-		data["result"] = result
-		api.NewResponse(c, http.StatusOK, nil, data)
 	}
+
+	result, total, err := service.GetMachines(paramMap)
+	if err != nil {
+		api.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	data["total"] = total
+	data["results"] = result
+	api.Success(c, data, "")
+
 }
 
+func GetSNS(c *gin.Context) {
+	data := make(map[string]interface{})
+	sns, err := service.GetAllSN()
+	if err != nil {
+		api.Error(c, http.StatusInternalServerError, "server error")
+		return
+	}
+	data["total"] = len(sns)
+	data["results"] = sns
+	api.Success(c, data, "")
+}
+
+//use the sn to search the machine
 func GetMachine(c *gin.Context) {
 
 	sn := c.Param("sn")
-
 	data, err := service.GetMachine(sn)
 	if err != nil {
-		api.NewResponse(c, http.StatusBadRequest, err)
+		api.Error(c, http.StatusInternalServerError, "server error")
 		return
 	}
-	api.NewResponse(c, http.StatusOK, nil, data)
+	if data.SerialNumber == "" { //没找到
+		api.Fail(c, "machine not found")
+	}
+	api.Success(c, data, "")
 }
-
 
 func AddMachine(c *gin.Context) {
 
 	var data models.Machine
 
-	if err := c.BindJSON(data); err != nil {
-		api.NewResponse(c, http.StatusBadRequest, err)
+	if err := c.BindJSON(&data); err != nil {
+		api.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if err := service.AddMachine(&data); err != nil {
-		api.NewResponse(c, http.StatusInternalServerError, err)
+		api.Error(c, http.StatusInternalServerError, "server error")
 		log.Printf("AddWorkRecord error:%v, %v", err, data)
 		return
 	}
-	api.NewResponse(c, http.StatusOK)
+
+	api.Success(c, nil, "")
 }
-
-
 
 //更新字段
 func UpdateMachine(c *gin.Context) {
 
 	var data models.Machine
 
+	sn := c.Param("sn")
+	m, err := service.GetMachine(sn)
+	if err != nil {
+		api.Error(c, http.StatusInternalServerError, "server error")
+		return
+	}
+	if m.SerialNumber == "" { //没找到
+		api.Fail(c, "machine not found")
+	}
+
 	if err := json.NewDecoder(c.Request.Body).Decode(&data); err != nil {
-		api.NewResponse(c, http.StatusBadRequest, err)
+		api.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if data.IsEmpty() {
-		api.NewResponse(c, http.StatusBadRequest, "At least one correct field name is required")
+		api.Error(c, http.StatusBadRequest, "At least one correct field name is required")
 		return
 	}
 
-	data.KSHeader = &models.KSHeader{SerialNumber:c.Param("sn")}
+	data.KSHeader = &models.KSHeader{SerialNumber: m.SerialNumber}
 
-
-	err := service.UpdateMachine(&data)
+	err = service.UpdateMachine(&data)
 	if err != nil {
-		api.NewResponse(c, http.StatusBadRequest, err)
+		api.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	api.NewResponse(c, http.StatusOK)
+	api.Success(c, nil, "")
 }
-
 
 func DeleteMachine(c *gin.Context) {
 
 	sn := c.Param("sn")
-	if err := service.DeleteMachine(sn); err != nil {
-		api.NewResponse(c, http.StatusBadRequest, err)
+	count, err := service.DeleteMachine(sn)
+	if err != nil {
+		api.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	api.NewResponse(c, http.StatusOK)
+	if count == 0 {
+		api.Fail(c, "machine not found")
+		return
+	}
+	api.Success(c, map[string]interface{}{
+		"count": count,
+	}, "")
 }
-
 
 //机器信息的excel表格上传导入到mysql
 func UploadExcel(c *gin.Context) {
@@ -135,25 +172,27 @@ func UploadExcel(c *gin.Context) {
 		return
 	}
 	// 上传文件至指定目录
-	if err := c.SaveUploadedFile(file, file.Filename); err != nil {
+	err = c.SaveUploadedFile(file, file.Filename)
+	if err != nil {
 		log.Error(err)
-		api.NewResponse(c, http.StatusInternalServerError, err)
-	} else {
-
-		f, err := excelize.OpenFile(file.Filename)
-		if err != nil {
-			log.Errorf("excelize.OpenFile: %v", err)
-		}
-
-		instance, err := service.LoadToDB(f, c.DefaultQuery(`SheetName`, service.SheetName))
-		if err != nil {
-			log.Error(err)
-			api.NewResponse(c, http.StatusInternalServerError, err)
-		}
-		_ = os.Remove(file.Filename)
-		data := make(map[string]interface{})
-		data["alreadyExisted"] = instance
-		api.NewResponse(c, http.StatusCreated, fmt.Sprintf("'%s' uploaded success!", file.Filename), data)
+		api.Error(c, http.StatusInternalServerError, err.Error())
+		return
 	}
+	f, err := excelize.OpenFile(file.Filename)
+	if err != nil {
+		log.Errorf("excelize.OpenFile: %v", err)
+	}
+
+	instance, err := service.LoadToDB(f, c.DefaultQuery(`SheetName`, service.SheetName))
+	if err != nil {
+		log.Error(err)
+		api.Error(c, http.StatusInternalServerError, err.Error())
+	}
+	_ = os.Remove(file.Filename)
+	data := make(map[string]interface{})
+	if len(instance) >0 {
+		data["alreadyExisted"] = instance
+	}
+	api.Success(c, data, "success")
 
 }

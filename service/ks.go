@@ -2,25 +2,9 @@ package service
 
 import (
 	"Installer/models"
-	"errors"
 	"fmt"
 	"github.com/jinzhu/gorm"
 )
-
-//根据序列号返回整列
-func SearchKSInfo(SerialNumber string) (*models.Machine, error) {
-
-	var err error
-	instance := models.Machine{}
-
-	if err = db.Where("SerialNumber = ?", SerialNumber).First(&instance).Error; err != nil {
-		return nil, err
-	}
-	if instance.ID == 0 {
-		return nil, errors.New("not found")
-	}
-	return &instance, nil
-}
 
 //记录ks的header里的mac填充到数据库里
 func FillNicInfo(m *models.KSHeader) (err error) {
