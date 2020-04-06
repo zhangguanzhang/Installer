@@ -2,24 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="7459974e-b442-4091-8934-796ed8172473" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/api/common.go" beforeDir="false" afterPath="$PROJECT_DIR$/api/common.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/v1/ks.go" beforeDir="false" afterPath="$PROJECT_DIR$/api/v1/ks.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/v1/machine.go" beforeDir="false" afterPath="$PROJECT_DIR$/api/v1/machine.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docker/scripts/machine.xlsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/docker/templates/ks.tmpl" beforeDir="false" afterPath="$PROJECT_DIR$/docker/templates/ks.tmpl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/api.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/api.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/linux-start.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/linux-start.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/models/model.go" beforeDir="false" afterPath="$PROJECT_DIR$/models/model.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/router/router.go" beforeDir="false" afterPath="$PROJECT_DIR$/router/router.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/service/ks.go" beforeDir="false" afterPath="$PROJECT_DIR$/service/ks.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/service/machine.go" beforeDir="false" afterPath="$PROJECT_DIR$/service/machine.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/service/mysql.go" beforeDir="false" afterPath="$PROJECT_DIR$/service/mysql.go" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />

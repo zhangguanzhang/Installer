@@ -66,6 +66,7 @@ func GetKsFile(KSTemplate string) gin.HandlerFunc {
 				//此处记录未录入库发起ks请求的机器的序列号
 				log.Warnf("record not found %v", sn)
 				api.Error(c, http.StatusInternalServerError, "record not found")
+				return
 			}
 
 			info := &models.KSTemplateInfo{

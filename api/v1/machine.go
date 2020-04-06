@@ -88,6 +88,7 @@ func GetMachine(c *gin.Context) {
 	}
 	if data.SerialNumber == "" { //没找到
 		api.Fail(c, "machine not found")
+		return
 	}
 	api.Success(c, data, "")
 }
@@ -123,6 +124,7 @@ func UpdateMachine(c *gin.Context) {
 	}
 	if m.SerialNumber == "" { //没找到
 		api.Fail(c, "machine not found")
+		return
 	}
 
 	if err := json.NewDecoder(c.Request.Body).Decode(&data); err != nil {
@@ -187,6 +189,7 @@ func UploadExcel(c *gin.Context) {
 	if err != nil {
 		log.Error(err)
 		api.Error(c, http.StatusInternalServerError, err.Error())
+		return
 	}
 	_ = os.Remove(file.Filename)
 	data := make(map[string]interface{})
