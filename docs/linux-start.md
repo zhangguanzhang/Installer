@@ -124,7 +124,7 @@ arcconf安装在yum源里是没有的，Adaptec现在改名为Microsemi，下载
 自己的虚机上安装arcconf的rpm，然后服务器进入安装界面后ctrl+alt+f2进入终端，配置网络信息后把命令scp过来
 ```
 $ ip addr add 10.0.23.41/24 dev enp61s0f2
-$ route add -net 0.0.0.0/0 gw 10.0.23.1 dev enp61s0f2
+$ ip route add default via 10.0.23.1 # 或者route add -net 0.0.0.0/0 gw 10.0.23.1 dev enp61s0f2
 $ scp 10.0.23.79:/usr/sbin/arcconf /usr/sbin/
 $ arcconf getconfig 1 ld
 Controllers found: 1

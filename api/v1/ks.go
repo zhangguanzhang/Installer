@@ -29,7 +29,9 @@ const (
 func GetKsFile(KSTemplate string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sn := c.GetHeader(SerialNumber)
-		if sn != "" && len(sn) <= 21 { //vmware的虚机序列号会超过21，华为华三的序列号都是21位
+		//vmware的虚机序列号会超过21，华为华三的序列号都是21位
+		//最少有一个网卡的header
+		if sn != "" && len(sn) <= 21 && c.GetHeader(ProMac1) != "" {
 			ks := &models.KSHeader{
 				SerialNumber: sn,
 				Arch:         c.GetHeader(Architecture),
@@ -65,7 +67,8 @@ func GetKsFile(KSTemplate string) gin.HandlerFunc {
 			if m.SerialNumber == "" {
 				//此处记录未录入库发起ks请求的机器的序列号
 				log.Warnf("record not found %v", sn)
-				api.Error(c, http.StatusInternalServerError, "record not found")
+				//ks错误的话不能返回200状态码
+				api.Error(c, http.StatusBadRequest, "record not found in database")
 				return
 			}
 
