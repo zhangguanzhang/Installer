@@ -209,6 +209,7 @@ docker exec -ti pxe_mysql mysql -u root -p
 ```
 [H3C-S5130-dhcp-pool-1] bootfile-name BOOTX64.EFI
 [H3C-S5130-dhcp-pool-1] next-server 10.1.0.2
+[H3C-S5130-dhcp-pool-1] tftp-server ip-address 10.1.0.2
 ```
 因为我pc是`10.1.0.0/24`，得写个安装段16的路由 
 - `Installer`机器配置好ip为`10.1.0.2`, 并配置`10.1.0.0/16`的路由`route add -net 10.1.0.0/16 gw 10.1.0.254 dev ens37`，我pc是虚拟机桥接，根据自己情况去配置
