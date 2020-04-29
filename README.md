@@ -109,13 +109,13 @@
 ##### 准备go
 安装go，建议1.13以上版本，从官网获取下载直链，当然懂容器的话可以容器编译，这里是在Linux上非容器编译
 ```bash
-VERSION=1.14.1
+VERSION=1.14.2
 OS=linux
 ARCH=amd64
 wget https://dl.google.com/go/go$VERSION.$OS-$ARCH.tar.gz #下载多半需要梯子
 tar -C /usr/local -xzf go$VERSION.$OS-$ARCH.tar.gz
 # 配置环境变量
-cat <<EOF>> ~/.bashrc
+cat <<'EOF'>> ~/.bashrc
 export PATH=$PATH:/usr/local/go/bin
 export GO111MODULE=on
 export GOPROXY=https://goproxy.cn,https://mirrors.aliyun.com/goproxy/,https://goproxy.io,direct
